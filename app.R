@@ -7,42 +7,44 @@ library(shinyWidgets)  # Added for progressBar
 # Initialize global variables
 initial_points <- 5
 initial_health <- 100
-egg_price_base <- 10
+item_price_base <- 10
 max_health <- 100
 health_decay_rate <- 5 # Health lost per tick
-health_gained_per_egg <- 10
+health_gained_per_item <- 10
 points_per_tick <- 5
 tick_interval_ms <- 500 # 5 seconds
 
+context = sample(c("Eggs", "Insulin", "SP_500"), 1)
+
 # Initialize game state
 game_state <- reactiveVal(list(
-  egg_price = egg_price_base,
+  item_price = item_price_base,
   price_history = data.frame(
     timestamp = Sys.time(),
-    price = egg_price_base,
+    price = item_price_base,
     action = "start"
   ),
   timestamp = Sys.time()
 ))
 
 ui <- page_sidebar(
-  title = "The Game of Eggs",
+  title = stringr::str_glue("The Game of {context}"),
   
   sidebar = sidebar(
     width = 300,
     
     card(
       card_header("Game Controls"),
-      actionButton("buy_eggs", "Buy Eggs", class = "btn-primary btn-lg btn-block"),
+      actionButton("buy_item", stringr::str_glue("Buy {context}"), class = "btn-primary btn-lg btn-block"),
       hr(),
-      h4("Current Egg Price:"),
+      h4(stringr::str_glue("Current {context} Price:")),
       textOutput("current_price"),
       hr(),
       h4("Game Instructions:"),
       p("1. You earn points every 5 seconds"),
       p("2. Your health decreases over time"),
-      p("3. Buy eggs to restore health"),
-      p("4. Egg prices fluctuate over time"),
+      p(stringr::str_glue("3. Buy {context} to restore health")),
+      p(stringr::str_glue("4. {context} prices fluctuate over time")),
       p("5. If your health reaches 0, game over!")
     )
   ),
@@ -70,7 +72,7 @@ ui <- page_sidebar(
   
   card(
     full_screen = TRUE,
-    card_header("Egg Price History"),
+    card_header(stringr::str_glue("{context} Price History")),
     card_body(
       min_height = 400,
       layout_column_wrap(
@@ -113,11 +115,11 @@ server <- function(input, output, session) {
     current_state <- game_state()
     
     # Calculate new price with some randomness (between 70% and 130% of base price)
-    new_price <- egg_price_base * runif(1, 0.7, 1.3) |> round(2) |> mean(current_state$egg_price)
+    new_price <- item_price_base * runif(1, 0.7, 1.3) |> round(2) |> mean(current_state$item_price)
     
     # Update game state
     new_state <- list(
-      egg_price = new_price,
+      item_price = new_price,
       price_history = rbind(
         current_state$price_history,
         data.frame(
@@ -142,9 +144,9 @@ server <- function(input, output, session) {
   })
   
   # Buy eggs
-  observeEvent(input$buy_eggs, {
+  observeEvent(input$buy_item, {
     current_state <- game_state()
-    current_price <- current_state$egg_price
+    current_price <- current_state$item_price
     
     # Check if player has enough points
     if (player$points >= current_price) {
@@ -152,11 +154,11 @@ server <- function(input, output, session) {
       player$points <- player$points - current_price
       
       # Increase health
-      player$health <- min(max_health, player$health + health_gained_per_egg)
+      player$health <- min(max_health, player$health + health_gained_per_item)
       
       # Add purchase to history
       new_state <- list(
-        egg_price = current_price,
+        item_price = current_price,
         price_history = rbind(
           current_state$price_history,
           data.frame(
@@ -177,13 +179,13 @@ server <- function(input, output, session) {
       
       # Notify the user
       showNotification(
-        paste("You bought eggs for", current_price, "points and gained health!"),
+        stringr::str_glue("You bought {context} for {current_price} points and gained health!"),
         type = "message"
       )
     } else {
       # Not enough points
       showNotification(
-        paste("Not enough points! You need", current_price, "points to buy eggs."),
+        stringr::str_glue("Not enough points! You need {current_price} points to buy {context}"),
         type = "error"
       )
     }
@@ -207,7 +209,7 @@ server <- function(input, output, session) {
   })
   
   output$current_price <- renderText({
-    paste0(game_state()$egg_price, " points")
+    paste0(game_state()$item_price, " points")
   })
   
   # Update health bar
@@ -238,7 +240,7 @@ server <- function(input, output, session) {
                 type = 'scatter', mode = 'lines+markers',
                 line = list(color = 'steelblue'),
                 marker = list(color = colors, size = 10)) |> 
-      layout(title = "Egg Price History",
+      layout(title = stringr::str_glue("{context} Price History"),
              xaxis = list(title = "Time"),
              yaxis = list(title = "Price (points)",
                           range = c(0, max(history$price) + 5)),
@@ -264,7 +266,7 @@ server <- function(input, output, session) {
       tail(20)
     
     
-    prediction =data.frame(price=rnorm(n = 100, mean = egg_price_base * runif(1, 0.7, 1.3),sd = 1), 
+    prediction =data.frame(price=rnorm(n = 100, mean = item_price_base * runif(1, 0.7, 1.3),sd = 1), 
                            time = Sys.time() + 1)
     
     prediction |> 
@@ -274,7 +276,7 @@ server <- function(input, output, session) {
     
       p <- ggplotly(gg) |> 
         layout(
-          title = "Egg Price Prediction",
+          title = stringr::str_glue("{context} Price Prediction"),
           xaxis = list(title = "Time"),
           yaxis = list(
           title = "Price (points)",
